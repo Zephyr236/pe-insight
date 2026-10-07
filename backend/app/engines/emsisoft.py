@@ -100,6 +100,32 @@ class EmsisoftEngine(EngineAdapter):
     def __init__(self) -> None:
         self._exe = find_a2cmd()
 
+    def _elevated(self) -> bool:
+        if sys.platform != "win32":
+            return True
+        try:
+            import ctypes
+
+            return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except OSError:
+            return False
+
+    def unavailable_reason(self) -> str:
+        if sys.platform != "win32":
+            return "仅 Windows 平台可用"
+        if self._exe is None:
+            return (
+                "未找到 a2cmd.exe。请运行 `python -m app.cli setup-emsisoft` "
+                "下载 Emsisoft Emergency Kit（免费、无时间限制、限私人非商业用途）"
+            )
+        if not self._elevated():
+            return (
+                "a2cmd 需要管理员权限。请用项目根目录的 start.ps1 启动"
+                "（它会自动请求提权），或直接禁用该引擎："
+                "PEINSIGHT_DISABLED_ENGINES=emsisoft"
+            )
+        return "不可用"
+
     @property
     def offline(self) -> bool:  # type: ignore[override]
         """加上 /cloud=0 后扫描完全本地。
@@ -114,15 +140,9 @@ class EmsisoftEngine(EngineAdapter):
         return "扫描时使用 /cloud=0，完全本地；签名更新需另行手动触发"
 
     def available(self) -> bool:
-        return self._exe is not None
-
-    def unavailable_reason(self) -> str:
-        if sys.platform != "win32":
-            return "仅 Windows 平台可用"
-        return (
-            "未找到 a2cmd.exe。请运行 `python -m app.cli setup-emsisoft` "
-            "下载 Emsisoft Emergency Kit（免费、无时间限制、限私人非商业用途）"
-        )
+        # 必须同时满足"装了"和"提权了"。非提升会话下 a2cmd 不会快速失败，
+        # 而是一声不吭地挂到超时（实测挂满 300 秒），白白浪费五分钟。
+        return self._exe is not None and self._elevated()
 
     def scan(self, ctx: ScanContext) -> EngineResult:
         assert self._exe is not None
