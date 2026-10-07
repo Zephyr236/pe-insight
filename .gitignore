@@ -1,0 +1,25 @@
+# 数据目录：样本和报告绝不应进版本库
+data/
+*.db
+
+# ClamAV 便携版（含签名库约 700 MB，用 setup-clamav 重新获取）
+tools/
+
+# 前端截图产物
+frontend/_shots/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# 前端
+node_modules/
+frontend/dist/
+.vite/
+
+# 编辑器
+.vscode/
+.idea/

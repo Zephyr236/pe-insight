@@ -1,0 +1,21 @@
+# 统一换行符，避免 Windows/Linux 协作者之间产生无意义的 diff
+#
+# 文本文件在仓库里一律存 LF，检出到工作区时按平台转成 CRLF（Windows）。
+# PowerShell 脚本必须显式声明：它们需要 CRLF 才能被某些旧工具正确处理。
+* text=auto eol=lf
+
+*.ps1   text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# 二进制文件不要做任何转换
+*.exe   binary
+*.dll   binary
+*.zip   binary
+*.cvd   binary
+*.cld   binary
+*.png   binary
+*.ico   binary
+
+# 锁文件不参与 diff 统计（体积大且噪音多），但仍然提交
+package-lock.json  -diff

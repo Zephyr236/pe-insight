@@ -1,0 +1,24 @@
+# Web 层
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+python-multipart>=0.0.9
+
+# 数据层
+sqlmodel>=0.0.22
+pydantic>=2.7.0
+
+# 静态分析
+pefile>=2024.8.26
+yara-python>=4.5.1
+
+# 动态分析（模拟执行，样本不真正运行）
+# 注意：speakeasy-emulator 依赖已被 setuptools 81+ 移除的 distutils，
+# 安装前需要先装 "setuptools<81"。同时它对 Python 3.12+ 支持不稳定，
+# 本项目固定使用 Python 3.11。
+speakeasy-emulator>=1.5.10
+
+# 能力分析（CAPA）
+# 这里用 pip 版而不是官方 Windows 发布包：官方包是 PyInstaller 打包的，
+# 在部分机器上分析样本时会死锁（实测 1.4s CPU 卡 90s 不返回）。
+# pip 版走普通 Python 解释器，无此问题。规则集由 setup-tools 单独下载。
+flare-capa>=9.0.0

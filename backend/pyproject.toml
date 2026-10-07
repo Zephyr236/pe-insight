@@ -1,0 +1,52 @@
+[project]
+name = "pe-insight"
+version = "0.1.0"
+description = "本地多引擎 Windows PE 分析平台 —— 样本永不离开本机"
+readme = "../README.md"
+requires-python = ">=3.11,<3.12"
+license = { file = "../LICENSE" }
+keywords = ["malware", "pe", "antivirus", "yara", "reverse-engineering", "dfir"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Security",
+]
+
+# 运行期依赖与 requirements.txt 保持一致。
+# 之所以两份都留：requirements.txt 给 uv pip install 用，
+# pyproject 给工具链（打包、IDE、依赖分析）识别项目元数据。
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "python-multipart>=0.0.9",
+    "sqlmodel>=0.0.22",
+    "pydantic>=2.7.0",
+    "pefile>=2024.8.26",
+    "yara-python>=4.5.1",
+    "speakeasy-emulator>=1.5.10",
+    "flare-capa>=9.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/OWNER/pe-insight"
+Issues = "https://github.com/OWNER/pe-insight/issues"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+# 项目规模不大，先只开最基础的检查
+lint.select = ["E", "F", "W", "I", "UP", "B"]
+lint.ignore = [
+    "E501",  # 行长由 formatter 处理
+]
+
+[tool.ruff.lint.per-file-ignores]
+# 规则 DSL 与测试里常见的长行/魔法值
+"tests/**" = ["B011"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

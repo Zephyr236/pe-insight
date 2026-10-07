@@ -1,0 +1,57 @@
+MIT License
+
+Copyright (c) 2026 PE Insight contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+THIRD-PARTY NOTICES
+
+This project orchestrates third-party analysis engines. Their licenses are
+independent of the MIT license above:
+
+  ClamAV                 GPL-2.0        invoked as a separate process (clamscan/
+                                        clamdscan), not linked. Distributed
+                                        separately, see https://www.clamav.net
+
+  Emsisoft Emergency Kit Proprietary    FREE FOR PRIVATE, NON-COMMERCIAL USE
+                                        ONLY. Commercial use requires a license
+                                        from Emsisoft. This project only
+                                        downloads it on demand and never
+                                        redistributes it. See
+                                        https://www.emsisoft.com
+
+  YARA / yara-python     BSD-3-Clause   https://github.com/VirusTotal/yara
+
+  Detect It Easy         MIT            https://github.com/horsicq/Detect-It-Easy
+
+  Manalyze               GPL-3.0        https://github.com/JusticeRage/Manalyze
+
+  CAPA                   Apache-2.0     https://github.com/mandiant/capa
+
+  Speakeasy              Apache-2.0     https://github.com/mandiant/speakeasy
+
+  Windows Defender       Proprietary    Part of Microsoft Windows; used via the
+                                        system-provided MpCmdRun.exe.
+
+Users are responsible for complying with each engine's license. In particular,
+if you intend to use this project commercially, review the Emsisoft terms and
+either purchase a commercial license or disable that engine
+(PEINSIGHT_DISABLED_ENGINES=emsisoft).
