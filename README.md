@@ -88,7 +88,7 @@ cd pe-insight
 |---|---|
 | 检查环境 | 确认是 Windows；没有 `uv` 会询问是否自动安装 |
 | Python | 装 Python 3.11 + 虚拟环境 + 依赖（约 100 MB） |
-| 前端 | `npm install` + `npm run build`（需要 Node.js） |
+| 前端 | 使用仓库自带的构建产物（`frontend/dist/`），**不需要 Node.js** |
 | 分析引擎 | 下载 ClamAV / Emsisoft / DIE / Manalyze / CAPA（约 2.5 GB） |
 | YARA 规则 | 下载 signature-base 规则集（747 个文件，约 9 MB） |
 
@@ -98,7 +98,7 @@ cd pe-insight
 
 ```powershell
 .\setup.ps1 -SkipTools      # 只装代码依赖，不下载 2.5 GB 引擎
-.\setup.ps1 -SkipFrontend   # 不构建前端（CLI 和 API 仍可用）
+.\setup.ps1 -BuildFrontend  # 从源码重建前端（改 frontend/src/ 时才需要，要 Node.js）
 .\setup.ps1 -Force          # 强制重跑所有步骤
 ```
 

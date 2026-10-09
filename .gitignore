@@ -17,8 +17,12 @@ venv/
 
 # 前端
 node_modules/
-frontend/dist/
 .vite/
+
+# 注意：frontend/dist/ **故意不忽略**。
+# 构建产物随仓库提交，使用者就不需要 Node.js 工具链。
+# 改了 frontend/src/ 之后请执行 `npm run build` 并提交产物，
+# 否则仓库里的 UI 会和源码对不上。
 
 # 编辑器
 .vscode/

@@ -51,8 +51,22 @@ cd backend
 
 # 前端热重载（另开一个终端，后端保持运行）
 cd frontend
+npm install
 npm run dev
 ```
+
+> **改了 `frontend/src/` 之后，记得重建并提交产物。**
+>
+> `frontend/dist/` 是提交进仓库的——使用者因此不需要 Node.js 工具链。
+> 代价是源码和产物可能不同步，所以改完前端要跑一次：
+>
+> ```powershell
+> cd frontend
+> npm run build
+> git add dist && git commit -m "build: 重建前端产物"
+> ```
+>
+> 忘了这一步的话，仓库里的 UI 会和 `src/` 对不上，而使用者拿到的正是产物。
 
 ## 三、代码风格
 

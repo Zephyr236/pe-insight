@@ -2,15 +2,18 @@
 #
 #   .\setup.ps1                  安装全部（含约 2.5 GB 的分析引擎）
 #   .\setup.ps1 -SkipTools       只装代码依赖，不下载分析引擎
-#   .\setup.ps1 -SkipFrontend    跳过前端构建
+#   .\setup.ps1 -BuildFrontend   从源码重建前端（需要 Node.js，改前端时才用）
 #   .\setup.ps1 -Force           重新执行所有步骤，不跳过已完成项
 #
 # 这个脚本会依次完成：
 #   1. 检查 Windows 与 Python 版本
 #   2. 准备 uv（没有就自动装）
 #   3. 装 Python 3.11 + 虚拟环境 + Python 依赖
-#   4. 构建前端（需要 Node.js）
+#   4. 准备前端（用仓库自带的构建产物，**不需要 Node.js**）
 #   5. 下载分析引擎（ClamAV / Emsisoft / DIE / Manalyze / CAPA）
+#
+# 前端产物（frontend/dist/）是随仓库提交的，所以使用者不需要 Node.js 工具链。
+# 只有改了 frontend/src/ 的贡献者才需要 -BuildFrontend。
 #
 # 不需要管理员权限。防火墙和 Defender 排除项在 start.ps1 里按需处理。
 #
@@ -19,7 +22,7 @@
 
 param(
     [switch]$SkipTools,
-    [switch]$SkipFrontend,
+    [switch]$BuildFrontend,
     [switch]$Force
 )
 
@@ -119,19 +122,20 @@ if ($LASTEXITCODE -ne 0) { Die '依赖安装失败' }
 Say '  ✓ Python 环境就绪'
 
 # ---------------------------------------------------------------- 3. 前端
-Step 3 5 '构建前端'
+Step 3 5 '准备前端'
 
+# 前端产物随仓库提交（frontend/dist/），使用者不需要 Node.js。
+# 构建产物不入库是常见做法，但代价是每个使用者都得装一整条前端工具链——
+# 对一个"clone 下来就能用"的桌面工具来说不划算。产物只有 176 KB。
 $distIndex = Join-Path $frontend 'dist\index.html'
-if ((Test-Path $distIndex) -and -not $Force) {
-    Say '  前端已构建，跳过（加 -Force 可强制重建）'
-} elseif ($SkipFrontend) {
-    Warn '已跳过前端构建。没有 dist 的话 Web UI 打不开，但不影响 CLI 和 API。'
-} else {
+
+if ($BuildFrontend) {
     $npm = (Get-Command npm -ErrorAction SilentlyContinue).Source
     if (-not $npm) {
-        Warn '未找到 Node.js / npm，无法构建前端。'
-        Say '  装好 Node.js (https://nodejs.org) 后重新运行，或加 -SkipFrontend。'
-        Say '  CLI 和 HTTP API 不受影响，只有 Web UI 用不了。'
+        Warn '未找到 Node.js / npm，无法从源码构建前端。'
+        Say '  装好 Node.js (https://nodejs.org) 后重试。'
+        if (-not (Test-Path $distIndex)) { Die '也没有可用的现成产物，前端无法就绪。' }
+        Say '  仓库自带的前端产物仍可用，本次继续。'
     } else {
         Push-Location $frontend
         try {
@@ -142,8 +146,13 @@ if ((Test-Path $distIndex) -and -not $Force) {
             & npm run build
             if ($LASTEXITCODE -ne 0) { Die '前端构建失败' }
         } finally { Pop-Location }
-        Say '  ✓ 前端已构建'
+        Say '  ✓ 前端已从源码重建'
     }
+} elseif (Test-Path $distIndex) {
+    Say '  使用仓库自带的构建产物，无需 Node.js'
+} else {
+    Warn '没有前端构建产物，Web UI 打不开（CLI 和 HTTP API 不受影响）。'
+    Say '  装 Node.js 后加 -BuildFrontend 重建，或重新 clone 一份。'
 }
 
 # ---------------------------------------------------------------- 4. 引擎

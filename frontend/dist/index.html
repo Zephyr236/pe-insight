@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PE Insight — 本地多引擎分析</title>
+    <script>
+      // 在首屏渲染前应用主题，避免主题闪烁
+      try {
+        var saved = localStorage.getItem('peinsight-theme')
+        if (saved) document.documentElement.dataset.theme = saved
+      } catch (e) {}
+    </script>
+    <script type="module" crossorigin src="/assets/index-RtzjtgaQ.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BmbOjaCE.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
