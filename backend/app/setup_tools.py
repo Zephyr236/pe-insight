@@ -25,6 +25,7 @@ import zipfile
 from pathlib import Path
 
 from .config import settings
+from . import download
 
 DIE_URL = (
     "https://github.com/horsicq/Detect-It-Easy/releases/download/Beta/"
@@ -53,7 +54,7 @@ def _download(url: str, dest: Path, progress, label: str) -> bool:
     progress(f"  下载 {label}…")
     req = urllib.request.Request(url, headers={"User-Agent": "pe-insight-setup"})
     try:
-        with urllib.request.urlopen(req, timeout=300) as resp:  # noqa: S310
+        with download.urlopen(req, timeout=300) as resp:
             total = int(resp.headers.get("Content-Length") or 0)
             done = 0
             with dest.open("wb") as handle:

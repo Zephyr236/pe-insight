@@ -4,6 +4,26 @@
 
 ## [未发布]
 
+### 修复：全新机器上安装程序全线失败
+
+在一台干净的 Windows 上实测安装，发现两个必现问题：
+
+- **所有下载报 `CERTIFICATE_VERIFY_FAILED`**。各 `setup_*` 模块直接调
+  `urllib.request.urlopen()`，走 Python 默认 SSL 上下文，而 `uv` 装的
+  Python 在该机器上拿不到可用的根证书链（实测默认上下文只有 23 个根证书，
+  而 certifi 有 135 个）。同一个环境里 pip 是好的，因为 pip 自带 certifi。
+  现在统一走 `app/download.py`：把 certifi 的根证书合并进默认上下文，
+  并留出 `PEINSIGHT_CA_BUNDLE`（指定自有根证书）和
+  `PEINSIGHT_INSECURE_DOWNLOAD=1`（跳过校验）两个逃生口给 TLS 拦截环境。
+  证书错误现在会打印可操作的排查步骤，而不是一句 urlopen error。
+- **`setup.ps1` 最后一步崩溃**。第 203 行对原生命令用了 `2>&1 | Where-Object`，
+  而脚本开头设了 `$ErrorActionPreference = 'Stop'`——PowerShell 5.1 会把
+  stderr 包成 `NativeCommandError` 并升级为终止错误，unicorn 的一条
+  `pkg_resources` 弃用告警就足以触发。已去掉该管道并临时放宽
+  ErrorActionPreference；那条告警本身在 `app/__init__.py` 里精确滤掉了。
+
+`certifi` 因此成为显式依赖（此前只是传递依赖）。
+
 ### 变更：YARA 规则改为消费第三方规则集
 
 不再自带手写规则，改用 [Neo23x0/signature-base](https://github.com/Neo23x0/signature-base)

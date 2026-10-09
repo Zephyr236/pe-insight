@@ -200,7 +200,18 @@ Say ''
 Say '  已安装的组件：' White
 Push-Location $backend
 try {
-    & $python -m app.cli engines 2>&1 | Where-Object { $_ -notmatch 'pkg_resources|UserWarning' }
+    # ⚠ 这里刻意**不用** `2>&1`。
+    # PowerShell 5.1 会把原生命令 stderr 的每一行包成 NativeCommandError
+    # 记录，而本脚本开头设了 $ErrorActionPreference = 'Stop'——那会让它直接
+    # 升级为终止错误，把安装程序的最后一步炸掉。
+    # （实测：unicorn 的一条 pkg_resources 弃用告警就足以触发。）
+    # 那条告警已在 app/__init__.py 里滤掉，所以也不需要再过滤输出。
+    # 保险起见仍然临时放宽 ErrorActionPreference，防止别的工具写 stderr。
+    $eap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $python -m app.cli engines
+    } finally { $ErrorActionPreference = $eap }
 } finally { Pop-Location }
 
 Say ''

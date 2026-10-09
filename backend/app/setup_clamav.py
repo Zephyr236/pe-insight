@@ -16,6 +16,7 @@ import zipfile
 from pathlib import Path
 
 from .config import settings
+from . import download
 
 CLAMAV_VERSION = "1.5.4"
 DOWNLOAD_URL = (
@@ -41,7 +42,7 @@ def logs_dir() -> Path:
 def _download(url: str, dest: Path, progress) -> None:
     """流式下载并回报进度——包体有两百多 MB，必须让用户看到进展。"""
     req = urllib.request.Request(url, headers={"User-Agent": "pe-insight-setup"})
-    with urllib.request.urlopen(req, timeout=120) as resp:  # noqa: S310 - 固定的官方 URL
+    with download.urlopen(req, timeout=120) as resp:
         total = int(resp.headers.get("Content-Length") or 0)
         done = 0
         chunk = 1024 * 256

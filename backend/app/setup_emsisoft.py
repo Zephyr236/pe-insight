@@ -18,6 +18,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from . import download
 from .config import settings
 
 DOWNLOAD_URL = "https://dl.emsisoft.com/EmsisoftEmergencyKit.exe"
@@ -38,7 +39,7 @@ def a2cmd_path() -> Path:
 
 def _download(url: str, dest: Path, progress) -> None:
     req = urllib.request.Request(url, headers={"User-Agent": "pe-insight-setup"})
-    with urllib.request.urlopen(req, timeout=300) as resp:  # noqa: S310 - 固定官方 URL
+    with download.urlopen(req, timeout=300) as resp:
         total = int(resp.headers.get("Content-Length") or 0)
         done = 0
         with dest.open("wb") as handle:

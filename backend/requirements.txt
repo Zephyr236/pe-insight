@@ -1,3 +1,8 @@
+# 下载分析引擎时用到的根证书包。
+# 不能省：uv 装的 Python 在部分 Windows 上默认 SSL 上下文拿不到可用的证书链，
+# 导致 setup-* 全部下载失败（CERTIFICATE_VERIFY_FAILED）。详见 app/download.py。
+certifi>=2024.7.4
+
 # Web 层
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0

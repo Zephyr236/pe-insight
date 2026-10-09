@@ -28,6 +28,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from .config import settings
+from . import download
 
 #: GitHub 仓库 API，列出 yara/ 目录。未认证请求每小时 60 次，一次更新用 1 次。
 LIST_URL = "https://api.github.com/repos/Neo23x0/signature-base/contents/yara"
@@ -49,7 +50,7 @@ def installed_count() -> int:
 
 def _fetch(url: str, timeout: int = 60) -> bytes:
     req = urllib.request.Request(url, headers=_UA)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+    with download.urlopen(req, timeout=timeout) as resp:
         return resp.read()
 
 

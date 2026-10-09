@@ -19,6 +19,7 @@ classifiers = [
 # 之所以两份都留：requirements.txt 给 uv pip install 用，
 # pyproject 给工具链（打包、IDE、依赖分析）识别项目元数据。
 dependencies = [
+    "certifi>=2024.7.4",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "python-multipart>=0.0.9",

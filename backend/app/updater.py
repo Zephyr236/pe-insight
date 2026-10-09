@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import settings
+from . import download
 
 _NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
@@ -232,7 +233,7 @@ def _merge_tree(src: Path, dst: Path) -> tuple[int, int]:
 def _download_zip(url: str, dest: Path, target: Path, progress, label: str) -> tuple[bool, str]:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "pe-insight-update"})
-        with urllib.request.urlopen(req, timeout=300) as resp:  # noqa: S310
+        with download.urlopen(req, timeout=300) as resp:
             blob = resp.read()
     except (urllib.error.URLError, OSError) as exc:
         return False, f"下载失败：{exc}"
