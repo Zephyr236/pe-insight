@@ -63,8 +63,8 @@
 
 </details>
 
-> 截图里跑的是 `demo` 命令生成的人工合成样本（只有字符串，不含可执行恶意代码），
-> 用来演示检测链路。
+> 截图里跑的是人工构造的合成样本（只有字符串，不含可执行恶意代码），
+> 用来演示检出链路。生成它的脚本已随 demo 功能一并移除，截图本身仍在。
 
 ---
 
@@ -73,7 +73,7 @@
 **三步：clone → 装 → 跑。**
 
 ```powershell
-git clone https://github.com/OWNER/pe-insight.git
+git clone https://github.com/Zephyr236/pe-insight.git
 cd pe-insight
 
 .\setup.ps1          # 或双击 setup.bat —— 装依赖 + 下载分析引擎
@@ -90,6 +90,7 @@ cd pe-insight
 | Python | 装 Python 3.11 + 虚拟环境 + 依赖（约 100 MB） |
 | 前端 | `npm install` + `npm run build`（需要 Node.js） |
 | 分析引擎 | 下载 ClamAV / Emsisoft / DIE / Manalyze / CAPA（约 2.5 GB） |
+| YARA 规则 | 下载 signature-base 规则集（747 个文件，约 9 MB） |
 
 **不需要管理员权限。** 最耗时的是最后一步，会先问你一次再开始。
 
@@ -127,13 +128,14 @@ cd pe-insight
 ```powershell
 cd backend
 .\.venv\Scripts\python.exe -m app.cli selftest    # 引擎是否真的在查杀
-.\.venv\Scripts\python.exe -m app.cli demo        # 合成样本，演示检测链路
 .\.venv\Scripts\python.exe -m app.cli verify-offline  # 实测断网可行性
 ```
 
-**`demo` 是最快看到效果的方式**——它生成 4 个人工构造的无害样本
-（只含字符串，不含可执行恶意代码），能触发 YARA 规则，让你看到完整的
-"检出 → 恶意结论 → UI 展示"链路。扫干净文件是看不出任何东西的。
+**`selftest` 是最快看到效果的方式**——它用 EICAR 测试串逐引擎验证，
+确认每个引擎真的在查杀而不是"沉默地失败"。
+
+扫干净的系统文件是看不出任何东西的：所有引擎都会说"干净"。要看真实的
+检出效果，拿一份真实样本来扫（先把 `data/` 加进 Defender 排除列表）。
 
 ---
 
@@ -145,12 +147,12 @@ cd backend
 | `serve` | 启动 Web 服务 |
 | `engines` | 查看各引擎状态（含被安全策略排除者及原因） |
 | `selftest` | 用 EICAR 验证引擎是否真的在查杀 |
-| `demo` | 生成合成样本，演示检测链路 |
 | `verify-offline` | 实测出网拦截与断网可行性 |
 | `privacy` | 审计样本外传通道 |
 | `setup-clamav` | 下载配置 ClamAV 便携版（`--force` 重下，`--skip-db` 跳过签名库） |
 | `setup-emsisoft` | 下载配置 Emsisoft Emergency Kit（同上开关） |
 | `setup-tools` | 下载配置 DIE / Manalyze / CAPA（开源、本地、免费） |
+| `setup-yara` | 下载 signature-base YARA 规则集（5000+ 条，开源） |
 | `update` | 更新签名库与规则集（`--check` 只看新鲜度，`--only X,Y` 指定组件，`--if-stale-hours N` 只更新过期的） |
 | `clamd start\|stop\|status` | 管理 ClamAV 守护进程（把扫描从 ~3s 降到 ~130ms） |
 | `setup-exclusions` | 把数据目录加入 Defender 排除列表（**分析真实样本的前提**） |
@@ -166,7 +168,7 @@ cd backend
 |---|---|---|---|
 | **ClamAV** | 需安装 | 完全本地 | `setup-clamav` 一键装；有守护进程时走 clamdscan |
 | **Emsisoft** | 需安装 | 完全本地 | `setup-emsisoft` 一键装 EEK；扫描固定传 `/cloud=0` |
-| **YARA** | 开箱可用 | 完全本地 | 规则放 `rules/`，支持 `verdict` / `family` meta |
+| **YARA** | 需下规则 | 完全本地 | 规则集 `setup-yara` 一键装（signature-base，5200+ 条）；自有规则放 `rules/` |
 | **Windows Defender** | 开箱可用 | **仅元数据** | `MpCmdRun.exe`。取决于系统设置，运行时查证 |
 
 ### 结构 / 能力分析（不看签名，看"是什么"和"能干什么"）
@@ -382,6 +384,12 @@ class EngineAdapter(ABC):
 
 **但要清楚**：再加签名引擎救不了新型/加壳样本——它们看的是同一类特征。
 YARA 规则质量和模拟执行深度，比堆引擎数量更影响实战效果。
+
+不过**规则质量这件事本项目不自己扛**：早期试过手写规则，19 条里有 8 条在
+系统文件上误报（6.5%）——"API 存在性"这种判据根本立不住。现在直接消费
+第三方维护的 [signature-base](https://github.com/Neo23x0/signature-base)
+（5200+ 条，误报 0/124），本项目的定位是规则集的**消费者和调度者**，
+不是规则作者。
 
 ---
 
@@ -603,7 +611,7 @@ backend/app/
     base.py             EngineAdapter 接口 + Verdict 枚举
     defender.py         MpCmdRun 子进程
     clamav.py           clamdscan / clamscan，自动回退
-    yara_engine.py      yara-python，进程内
+    yara_engine.py      yara-python，进程内，容错加载
     registry.py         构造 + 离线/禁用过滤
   static/
     pe_analyzer.py      PE 结构、节区熵、导入表、加壳启发式
@@ -614,12 +622,13 @@ backend/app/
   privacy.py           Defender 云通道审计
   defender_exclusions.py  Defender 排除项管理
   selftest.py          EICAR 引擎自检
-  demo.py              合成样本生成器
+  demo.py              合成样本生成器（载荷从规则现取）
+  setup_yara.py        下载 signature-base 规则集（逐文件，绕开 Defender 拦截）
   clamd_manager.py     ClamAV 守护进程管理
   orchestrator.py      三层调度 + 结果聚合
   main.py              FastAPI
   cli.py               命令行入口
-rules/                 YARA 规则目录
+rules/                 自有 YARA 规则目录（第三方规则集在 tools/yara-rules/）
 tools/clamav/          ClamAV 便携版（自动下载，不入版本库）
 frontend/              React + Vite
 ```

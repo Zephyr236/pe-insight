@@ -156,12 +156,14 @@ if ($SkipTools) {
     Say '    .\.venv\Scripts\python.exe -m app.cli setup-clamav'
     Say '    .\.venv\Scripts\python.exe -m app.cli setup-emsisoft'
     Say '    .\.venv\Scripts\python.exe -m app.cli setup-tools'
+    Say '    .\.venv\Scripts\python.exe -m app.cli setup-yara'
 } else {
     Say ''
     Say '  接下来会下载约 2.5 GB 的内容（全部来自各厂商官方源）：' White
     Say '    ClamAV 便携版 + 签名库     约 1.3 GB'
     Say '    Emsisoft Emergency Kit     约 0.7 GB'
     Say '    DIE / Manalyze / CAPA 规则 约 0.1 GB'
+    Say '    YARA 规则集(signature-base) 约 9 MB'
     Say ''
     Say '  这一步最耗时（视网速 10~30 分钟），且**需要联网**。'
     Say '  下载的是各引擎本体和签名库，**不涉及任何样本上传**。'
@@ -174,7 +176,8 @@ if ($SkipTools) {
         $steps = @(
             @{ name = 'ClamAV';    args = @('-m', 'app.cli', 'setup-clamav') },
             @{ name = 'Emsisoft';  args = @('-m', 'app.cli', 'setup-emsisoft') },
-            @{ name = 'DIE/Manalyze/CAPA'; args = @('-m', 'app.cli', 'setup-tools') }
+            @{ name = 'DIE/Manalyze/CAPA'; args = @('-m', 'app.cli', 'setup-tools') },
+            @{ name = 'YARA 规则集'; args = @('-m', 'app.cli', 'setup-yara') }
         )
         foreach ($s in $steps) {
             Write-Host ''

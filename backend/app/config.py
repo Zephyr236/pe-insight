@@ -27,6 +27,21 @@ class Settings:
         default_factory=lambda: _env_path("PEINSIGHT_YARA_RULES", BASE_DIR / "rules")
     )
 
+    #: 第三方规则集（signature-base）的下载位置。
+    #:
+    #: 放在 tools/ 下而不是 rules/ 下，跟 capa-rules 保持一致：它是下载物，
+    #: 不进版本库，由 setup-yara / update 维护。rules/ 留给使用者自己写的规则。
+    community_rules_dir: Path = field(
+        default_factory=lambda: _env_path(
+            "PEINSIGHT_YARA_COMMUNITY", BASE_DIR / "tools" / "yara-rules"
+        )
+    )
+
+    @property
+    def rules_dirs(self) -> tuple[Path, ...]:
+        """YARA 引擎实际加载的全部规则目录。"""
+        return (self.rules_dir, self.community_rules_dir)
+
     # 引擎与样本
     max_upload_mb: int = 512
     scan_timeout_s: int = 300

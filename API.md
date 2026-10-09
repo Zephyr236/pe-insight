@@ -25,7 +25,7 @@ $env:PEINSIGHT_API_KEY = "换成你自己的随机密钥"
 
 ```
 PE Insight 启动中 → http://0.0.0.0:8080
-局域网访问地址： http://192.168.1.173:8080
+局域网访问地址： http://192.168.1.100:8080
 鉴权：已启用（请求需带 X-API-Key 头）
 ```
 
@@ -44,7 +44,7 @@ New-NetFirewallRule -DisplayName "PE Insight API" -Direction Inbound `
 ### 从其他机器调用
 
 ```bash
-curl -H "X-API-Key: 你的密钥" http://192.168.1.173:8080/api/health
+curl -H "X-API-Key: 你的密钥" http://192.168.1.100:8080/api/health
 ```
 
 ---
@@ -178,13 +178,13 @@ GET /api/scans/{id} 轮询 → status 变 done 或 failed
 ```bash
 curl -H "X-API-Key: $KEY" \
      -F "file=@suspicious.exe" \
-     "http://192.168.1.173:8080/api/scans/upload?run_dynamic=false"
+     "http://192.168.1.100:8080/api/scans/upload?run_dynamic=false"
 ```
 
 ```python
 import requests, time
 
-BASE = "http://192.168.1.173:8080"
+BASE = "http://192.168.1.100:8080"
 HEAD = {"X-API-Key": "你的密钥"}
 
 with open("suspicious.exe", "rb") as f:
@@ -209,7 +209,7 @@ for e in s["engines"]:
 
 ```powershell
 $KEY = "你的密钥"
-$r = Invoke-RestMethod -Uri "http://192.168.1.173:8080/api/scans/upload?run_dynamic=false" `
+$r = Invoke-RestMethod -Uri "http://192.168.1.100:8080/api/scans/upload?run_dynamic=false" `
         -Method Post -Headers @{ "X-API-Key" = $KEY } -Form @{ file = Get-Item "C:\path\sample.exe" }
 $r.id
 ```
@@ -335,7 +335,7 @@ $r.id
 记录列表，最新的在前。
 
 ```bash
-curl -H "X-API-Key: $KEY" "http://192.168.1.173:8080/api/scans?limit=20"
+curl -H "X-API-Key: $KEY" "http://192.168.1.100:8080/api/scans?limit=20"
 ```
 
 返回摘要数组（不含各层详细报告），字段与详情接口的顶层一致。
@@ -397,7 +397,7 @@ $env:PEINSIGHT_DISABLED_ENGINES = "capa"    # 省掉最慢的那个
 
 1. 分析机上 `netstat -ano | findstr :8080` 确认监听在 `0.0.0.0` 而不是 `127.0.0.1`
 2. 防火墙有没有放行（见上面的 `New-NetFirewallRule`）
-3. 两台机器在不在同一网段（`ping 192.168.1.173`）
+3. 两台机器在不在同一网段（`ping 192.168.1.100`）
 4. 密钥对不对
 
 **Q：为什么 `detection_ratio` 的分母小于引擎总数？**

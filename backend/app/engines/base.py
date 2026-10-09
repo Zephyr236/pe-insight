@@ -165,6 +165,13 @@ class EngineAdapter(ABC):
         """对网络行为的补充说明，用于向用户如实交代。"""
         return ""
 
+    def load_note(self) -> str:
+        """已加载资源的状态说明（规则数、跳过了多少等）。
+
+        只有 YARA 这类"加载外部规则"的引擎需要。默认不产生说明。
+        """
+        return ""
+
     def timed_scan(self, ctx: ScanContext) -> EngineResult:
         """包一层计时与异常兜底，保证单个引擎崩溃不会拖垮整轮扫描。"""
         start = time.perf_counter()

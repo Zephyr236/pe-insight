@@ -122,8 +122,9 @@ cd backend
 
 - **引擎适配器**：mock 掉子进程调用，验证输出解析（尤其是畸形/多余输出）
 - **聚合逻辑**：`orchestrator.aggregate()` 的判定矩阵
-- **YARA 规则**：`demo.py` 生成的合成样本是现成的正向用例，
-  系统自带exe是现成的反向用例（**规则绝不能在这上面误报**）
+- **YARA 规则**：`tests/test_yara_rules.py` 会用规则自身的字符串构造合成
+  样本验证真阳性，再用系统自带的 exe/dll/sys 验证真阴性
+  （**规则绝不能在这上面误报**）
 
 > 历史教训：反调试规则曾经在 `notepad.exe` 上误报，因为把
 > `IsDebuggerPresent`、`OutputDebugString` 这类正常程序普遍导入的 API

@@ -2,6 +2,44 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 变更：YARA 规则改为消费第三方规则集
+
+不再自带手写规则，改用 [Neo23x0/signature-base](https://github.com/Neo23x0/signature-base)
+（5200+ 条）。原因：手写的"API 存在性"判据在系统文件上误报率过高——
+19 条规则里有 8 条命中 124 个系统文件中的 8 个（6.5%），`aitstatic.exe`
+和 `certutil.exe` 被判成勒索软件。换成 signature-base 后同一批文件
+**误报 0**。
+
+- 规则集下载到 `tools/yara-rules/`，`setup-yara` 安装、`update yara` 更新
+- `rules/` 保留给使用者自己写的规则
+- **逐文件下载而不是下 zip**：整包会被 Windows Defender 检出并锁死
+  （`ThreatID 2147965225`，读取报 `OSError Errno 22`），单个 `.yar` 则不会
+- YARA 引擎改为**容错加载**：747 个规则文件里有 13 个用到了本机 yara
+  构建未编入的模块或需要外部变量，而 `yara.compile(filepaths=...)` 是
+  原子的，一个坏文件会让整个规则库失效。现在退化为逐文件编译、剔除坏的、
+  如实报告跳过了哪些
+- 判定等级由规则名前缀 + `meta.score` 推导（signature-base 不带
+  `meta.verdict`）。命中按严重度排序，`signature` 取最重的一条
+
+### 移除：demo 功能
+
+`demo` 命令、`app/demo.py`、以及依赖它的 `scripts/prep_doc_shots.py`
+一并删除。合成样本的价值是"让检出链路肉眼可见"，但它的载荷必须绑定
+具体规则，规则一换（手写 → signature-base）这批样本就整体失效——维护
+成本大于收益。要看检出效果用 `selftest`（EICAR）或真实样本。
+
+README 截图对应的合成样本说明已同步改写，截图文件本身保留。
+
+### 测试
+
+- 新增 `backend/tests/`：真阳性（用规则自身的字符串构造样本）、
+  真阴性（180 个系统文件）、加载器容错、判定映射
+- 真阳性这组不能省：没有它，"零误报"可以靠一条规则都不加载来满足
+- 误报测试的取样口径与 `tools/diag_fp.py` 对齐（此前测试只取前 40 个，
+  比诊断脚本窄，会漏报误报）
+
 ## [0.1.0] - 2026-10-07
 
 首个可用版本。

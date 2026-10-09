@@ -112,11 +112,23 @@ def _capa_age() -> tuple[bool, float | None, str]:
     return True, age, f"{len(files)} 条规则"
 
 
+def _yara_age() -> tuple[bool, float | None, str]:
+    from . import setup_yara
+
+    files = list(settings.community_rules_dir.glob("*.yar"))
+    if not files:
+        return False, None, "未找到规则集"
+    newest = _newest_mtime(files)
+    age = (time.time() - newest) / 3600 if newest else None
+    return True, age, f"{len(files)} 个规则文件"
+
+
 _PROBES = {
     "clamav": ("ClamAV 签名库", _clamsig_age),
     "emsisoft": ("Emsisoft 签名库", _emsisoft_age),
     "die": ("DIE 检测库", _die_age),
     "capa": ("CAPA 规则集", _capa_age),
+    "yara": ("signature-base 规则集", _yara_age),
 }
 
 COMPONENTS = tuple(_PROBES)
@@ -289,11 +301,20 @@ def _update_capa(progress) -> tuple[bool, str]:
     return count > 0, f"{count} 条规则"
 
 
+def _update_yara(progress) -> tuple[bool, str]:
+    from . import setup_yara
+
+    if not setup_yara.install(force=True, progress=progress):
+        return False, "下载失败"
+    return True, f"{setup_yara.installed_count()} 个规则文件"
+
+
 _UPDATERS = {
     "clamav": _update_clamav,
     "emsisoft": _update_emsisoft,
     "die": _update_die,
     "capa": _update_capa,
+    "yara": _update_yara,
 }
 
 

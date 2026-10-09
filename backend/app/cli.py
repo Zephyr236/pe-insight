@@ -37,10 +37,16 @@ def cmd_engines(_args: argparse.Namespace) -> int:
     for row in rows:
         installed = "是" if row["available"] else "否"
         active = "是" if row["active"] else "否"
-        note = row["excluded_reason"] or row["reason"] or row["network_note"] or ""
+        note = (
+            row["excluded_reason"]
+            or row["reason"]
+            or row.get("load_note")
+            or row["network_note"]
+            or ""
+        )
         print(
             f"{row['name']:<20} {installed:<8} {active:<10} "
-            f"{row['network_level_text']:<14} {note[:44]}"
+            f"{row['network_level_text']:<14} {note[:52]}"
         )
 
     excluded = [r for r in rows if not r["active"]]
@@ -410,6 +416,23 @@ def cmd_setup_tools(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_setup_yara(args: argparse.Namespace) -> int:
+    """下载第三方 YARA 规则集（signature-base）。"""
+    from . import setup_yara
+
+    print("下载 signature-base 规则集（Florian Roth 维护，开源）")
+    print("规则来自第三方，本项目不自带手写规则。\n")
+
+    if not setup_yara.install(force=args.force, progress=print):
+        print("\n下载失败。可稍后重试，或加 --force 重新拉取。")
+        return 1
+
+    count = setup_yara.installed_count()
+    print(f"\n已就绪：{count} 个规则文件 → {setup_yara.rules_dir()}")
+    print("重启服务后生效（规则在启动时一次性编译）。")
+    return 0
+
+
 def cmd_setup_emsisoft(args: argparse.Namespace) -> int:
     """下载并配置 Emsisoft Emergency Kit。"""
     from . import setup_emsisoft
@@ -432,54 +455,6 @@ def cmd_setup_emsisoft(args: argparse.Namespace) -> int:
     print("\n授权提示：EEK 免费版**仅限私人非商业用途**，无时间限制；")
     print("          商用需购买 EEK Pro 或 Emsisoft 商业授权。")
     print("          扫描时本产品固定传 /cloud=0，不会向云端提交任何数据。")
-    return 0
-
-
-def cmd_demo(args: argparse.Namespace) -> int:
-    """生成合成样本并扫描，让检测链路的效果肉眼可见。
-
-    扫干净文件时所有引擎都说"干净"，看不出任何东西。这些合成样本
-    只含字符串、不含可执行恶意代码，但能让规则引擎命中，
-    从而把"检出 → 结论 → 展示"整条链路跑通。
-    """
-    from . import demo, orchestrator
-
-    generated = demo.generate()
-    if not generated:
-        print("未找到可用的 PE 载体（需要系统自带的可执行文件）")
-        return 1
-
-    print(f"已生成 {len(generated)} 个合成样本（无害，仅含字符串）")
-    print(f"存放位置：{generated[0]['path'].parent}\n")
-
-    print(f"{'样本':<20} {'结论':<8} {'检出':<8} 命中引擎")
-    print("-" * 78)
-
-    rows = []
-    for item in generated:
-        report = orchestrator.scan_file(item["path"], run_dynamic=False)
-        hits = [
-            f"{e['engine']}:{e['signature']}"
-            for e in report["engines"]
-            if e["verdict"] in ("malicious", "suspicious")
-        ]
-        rows.append((item["name"], report["verdict"], report["detection_ratio"], hits))
-        mark = _VERDICT_MARK.get(report["verdict"], report["verdict"])
-        print(f"{item['name']:<20} {mark:<8} {report['detection_ratio']:<8} {'、'.join(hits) or '—'}")
-
-    missed = [r for r in rows if r[1] == "clean"]
-    print()
-    if missed:
-        print(f"有 {len(missed)} 个合成样本未被检出：{'、'.join(r[0] for r in missed)}")
-        print("请检查 YARA 规则是否加载（python -m app.cli engines）")
-        return 1
-
-    print("全部合成样本均被检出——检测链路正常。")
-    print("\n提示：这些样本是人工构造的字符串，不是真实恶意软件。")
-    print("     它们可能会被 Defender 实时防护陆续隔离——那说明 Defender 在工作，")
-    print("     重跑本命令即可重新生成。")
-    print("\n要验证真实样本，请先把 data 目录加入 Defender 排除列表：")
-    print("  python -m app.cli setup-exclusions --yes   （需管理员权限）")
     return 0
 
 
@@ -764,10 +739,6 @@ def main(argv: list[str] | None = None) -> int:
         func=cmd_selftest
     )
 
-    sub.add_parser("demo", help="生成合成样本并扫描，演示检测链路").set_defaults(
-        func=cmd_demo
-    )
-
     sub.add_parser("privacy", help="审计样本外传通道").set_defaults(func=cmd_privacy)
 
     purge = sub.add_parser("purge-samples", help="清空已存样本（报告保留）")
@@ -810,6 +781,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     tools.add_argument("--force", action="store_true", help="重新下载")
     tools.set_defaults(func=cmd_setup_tools)
+
+    yara_rules = sub.add_parser(
+        "setup-yara", help="下载 signature-base YARA 规则集（5000+ 条，开源）"
+    )
+    yara_rules.add_argument("--force", action="store_true", help="重新下载")
+    yara_rules.set_defaults(func=cmd_setup_yara)
 
     upd = sub.add_parser("update", help="更新签名库与规则集")
     upd.add_argument("--check", action="store_true", help="只查看新鲜度，不下载")

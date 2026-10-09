@@ -41,7 +41,7 @@ def all_engines() -> list[EngineAdapter]:
         DefenderEngine(),
         ClamAVEngine(),
         EmsisoftEngine(),
-        YaraEngine(settings.rules_dir),
+        YaraEngine(settings.rules_dirs),
         # 结构/能力分析：不看签名，看这个文件"是什么"和"能干什么"。
         # 签名引擎对新型样本集体失明时，这一层是唯一的线索来源。
         DieEngine(),
@@ -101,6 +101,7 @@ def describe_engines() -> list[dict]:
                 "offline": level == NETWORK_LOCAL,
                 "network_note": engine.network_note(),
                 "available": available,
+                "load_note": engine.load_note(),
                 "reason": None if available else engine.unavailable_reason(),
                 # active=False 表示本次扫描不会用它
                 "active": reason is None,
