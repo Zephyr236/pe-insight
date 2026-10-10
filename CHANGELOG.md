@@ -22,6 +22,26 @@
 变量**（`filename` / `filepath` / `extension`，THOR/LOKI 那类扫描器会通过
 `-d` 传值），不是此前注释里写的"本机 yara 构建缺模块"。
 
+### 新增：支持外部变量，启用 652 条伪装检测规则
+
+signature-base 里有 13 个规则文件（652 条规则）依赖**外部变量**——
+`filename` / `filepath` / `extension` / `filetype`，原本是给 THOR / LOKI
+这类会通过 `-d` 传值的扫描器用的。不给值就编译不出来，整个文件被跳过。
+
+这些值我们自己知道，现在两个引擎扫描时都会填进去。规则加载数从
+**734/747 升到 746/747**（唯一仍跳过的是要 `owner` 的那个——NTFS 文件
+属主在 Windows 上拿不到）。
+
+启用的是**伪装检测**类规则，实测：
+
+- `calc.exe` 改名成 `svchost.exe` → `svchost_ANOMALY` 命中（两个引擎都是）
+- PE 挂 `.jpg` 后缀 → `SUSP_Known_Type_Cloaked_as_JPG` 命中
+- 原样的 `calc.exe` → 保持干净
+
+**取值的原则是"认不出来就留空"**：`filetype != "GIF"` 这种否定条件一旦
+拿到错误的非空值就会被错误地满足，直接变成误报。所以 `filetype` 只在确认
+是 PE 时才填 `EXE`。180 个系统文件的零误报测试依然通过。
+
 ### 修复：全新机器上安装程序全线失败
 
 在一台干净的 Windows 上实测安装，发现两个必现问题：

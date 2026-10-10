@@ -53,6 +53,48 @@ SCORE_MALICIOUS = 75
 _SEVERITY_RANK = {"malicious": 0, "pup": 1, "suspicious": 2, "clean": 3}
 
 
+# --------------------------------------------------------------------------
+# 外部变量
+# --------------------------------------------------------------------------
+#
+# signature-base 里有 13 个规则文件（652 条规则）用到了外部变量——那些规则
+# 原本是给 THOR / LOKI 这类会通过 `-d` 把文件名传进去的扫描器用的，单独
+# 交给 YARA 编译只会报 `undefined identifier`，整个文件被跳过。
+#
+# 这些值我们自己知道，填进去就能启用。但**填错比不填危险**：像
+# `filetype != "GIF"` 这种否定条件，一旦给了错误的非空值就会被错误地满足，
+# 直接变成误报。所以下面每个值都必须是准确知道的，认不出来就留空。
+
+#: 声明给规则的外部变量。改这个元组会同时影响两个引擎。
+EXTERNAL_NAMES = ("filename", "filepath", "extension", "filetype")
+
+#: `filetype` 是 magic 推导出的文件类型。本项目只做 PE，所以只认得出 EXE；
+#: 其余类型留空——留空时 `filetype == "EXE"` 为假（安全），`!=` 为真
+#: （实测唯一活着的否定条件是 `extension != ".msi"`，不受影响）。
+FILETYPE_PE = "EXE"
+
+
+def empty_externals() -> dict[str, str]:
+    """编译期用来声明外部变量的占位值。"""
+    return dict.fromkeys(EXTERNAL_NAMES, "")
+
+
+def external_values(sample_path: Path, *, is_pe: bool) -> dict[str, str]:
+    """每次扫描时传给规则的外部变量取值。
+
+    - `filename` / `filepath`：调用方实际扫描的路径，准确无误。
+    - `extension`：带前导点、小写的后缀。规则里写的就是 `.jpg` / `.exe` /
+      `.msi` 这种形式。
+    - `filetype`：只认得 PE。**认不出就留空，不要猜。**
+    """
+    return {
+        "filename": sample_path.name,
+        "filepath": str(sample_path),
+        "extension": sample_path.suffix.lower(),
+        "filetype": FILETYPE_PE if is_pe else "",
+    }
+
+
 def namespace_for(path: Path, root: Path) -> str:
     """给规则文件取一个跨目录唯一的命名空间名。
 

@@ -25,9 +25,12 @@ from .base import (
     ScanContext,
     Verdict,
 )
+from ..static.pe_analyzer import looks_like_pe
 from .yara_common import (
     SOURCE_GROUP,
     collect_rule_files,
+    empty_externals,
+    external_values,
     sort_hits,
     unique_namespaces,
     verdict_for,
@@ -84,10 +87,15 @@ class YaraEngine(EngineAdapter):
 
         namespaces = unique_namespaces(found)
 
+        # 外部变量必须在编译期就声明，扫描时再传实际值覆盖。
+        # signature-base 里有 13 个文件（652 条规则）依赖它们。
+        externals = empty_externals()
+
         # 先整体编译：一次编完最省事，也是绝大多数情况下的路径
         try:
             self._compiled = yara.compile(
-                filepaths={ns: str(path) for path, ns in namespaces}
+                filepaths={ns: str(path) for path, ns in namespaces},
+                externals=externals,
             )
             self._loaded_files = len(namespaces)
             return
@@ -99,7 +107,7 @@ class YaraEngine(EngineAdapter):
         skipped: list[tuple[str, str]] = []
         for path, ns in namespaces:
             try:
-                yara.compile(filepaths={ns: str(path)})
+                yara.compile(filepaths={ns: str(path)}, externals=externals)
                 good[ns] = str(path)
             except Exception as exc:  # noqa: BLE001 - 单个坏文件不应影响其它
                 skipped.append((path.name, str(exc).splitlines()[0][:120]))
@@ -111,7 +119,7 @@ class YaraEngine(EngineAdapter):
             return
 
         try:
-            self._compiled = yara.compile(filepaths=good)
+            self._compiled = yara.compile(filepaths=good, externals=externals)
         except Exception as exc:  # noqa: BLE001
             self._load_error = (
                 f"剔除 {len(skipped)} 个坏文件后仍无法编译："
@@ -146,7 +154,7 @@ class YaraEngine(EngineAdapter):
             return self.unavailable_reason()
         note = f"已加载 {self._loaded_files} 个规则文件"
         if self._skipped:
-            note += f"，跳过 {len(self._skipped)} 个（需要外部变量）"
+            note += f"，跳过 {len(self._skipped)} 个（编译失败）"
         return note
 
     def scan(self, ctx: ScanContext) -> EngineResult:
@@ -155,6 +163,9 @@ class YaraEngine(EngineAdapter):
         matches = self._compiled.match(
             str(ctx.sample_path),
             timeout=self._rule_timeout,
+            externals=external_values(
+                ctx.sample_path, is_pe=looks_like_pe(ctx.sample_path)
+            ),
         )
         if not matches:
             return EngineResult(

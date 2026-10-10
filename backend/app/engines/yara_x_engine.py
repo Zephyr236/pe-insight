@@ -36,9 +36,12 @@ from .base import (
     ScanContext,
     Verdict,
 )
+from ..static.pe_analyzer import looks_like_pe
 from .yara_common import (
     SOURCE_GROUP,
     collect_rule_files,
+    empty_externals,
+    external_values,
     sort_hits,
     unique_namespaces,
     verdict_for,
@@ -94,6 +97,12 @@ class YaraXEngine(EngineAdapter):
             return
 
         compiler = yara_x.Compiler()
+
+        # 外部变量必须在 add_source 之前定义。signature-base 里有 13 个文件
+        # （652 条规则）依赖它们，不定义就整份文件编译不过。
+        for name, value in empty_externals().items():
+            compiler.define_global(name, value)
+
         loaded = 0
         skipped: list[tuple[str, str]] = []
 
@@ -156,7 +165,7 @@ class YaraXEngine(EngineAdapter):
             return self.unavailable_reason()
         note = f"已加载 {self._loaded_files} 个规则文件"
         if self._skipped:
-            note += f"，跳过 {len(self._skipped)} 个（需要外部变量）"
+            note += f"，跳过 {len(self._skipped)} 个（编译失败）"
         return note
 
     def scan(self, ctx: ScanContext) -> EngineResult:
@@ -164,6 +173,11 @@ class YaraXEngine(EngineAdapter):
 
         scanner = yara_x.Scanner(self._rules)
         scanner.set_timeout(self._rule_timeout)
+
+        for name, value in external_values(
+            ctx.sample_path, is_pe=looks_like_pe(ctx.sample_path)
+        ).items():
+            scanner.set_global(name, value)
 
         try:
             results = scanner.scan_file(str(ctx.sample_path))

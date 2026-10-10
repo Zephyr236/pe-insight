@@ -29,14 +29,38 @@ cd backend
 
 所以本项目的定位是**规则集的消费者和调度者**，不是规则作者。
 
+### 外部变量：让 652 条规则活过来
+
+signature-base 里有 13 个规则文件（约 652 条规则）依赖**外部变量**
+（`filename` / `filepath` / `extension` / `filetype`）——那些规则原本是给
+THOR、LOKI 这类会通过 `-d` 把文件名传进去的扫描器用的，单独交给 YARA
+编译只会报 `undefined identifier`，整个文件被跳过。
+
+这些值我们自己知道，所以两个引擎在扫描时都会填进去。收益很实在：
+
+```
+svchost_ANOMALY                 文件叫 svchost.exe 但长得不像真的 svchost
+APT_Cloaked_CERTUTIL            伪装成 certutil 的样本
+SUSP_Known_Type_Cloaked_as_JPG  PE 文件挂着 .jpg 后缀
+SUSP_VULN_DRV_PROCEXP152_Renamed  改名的已知脆弱驱动（BYOVD）
+```
+
+实测：把 `calc.exe` 改名成 `svchost.exe`，两个引擎都会命中
+`svchost_ANOMALY`；改名的 PE 挂 `.jpg` 后缀会命中类型伪装规则；而原样的
+`calc.exe` 保持干净。
+
+**值必须是准确知道的，认不出来就留空。** 像 `filetype != "GIF"` 这类否定
+条件，一旦给了错误的非空值就会被错误地满足，直接变成误报。所以
+`filetype` 只在确认是 PE 时才填 `EXE`，其余留空。
+
+`owner`（NTFS 文件属主）在 Windows 上拿不到，那 1 个文件仍然被跳过。
+
 ### 加载是容错的
 
-signature-base 有 747 个规则文件，其中十几个用到了本机 yara 构建没编进去
-需要外部变量（`filename` / `filepath` / `extension`）——那些规则是给 THOR、
-LOKI 这类会通过 `-d` 把文件名传进去的扫描器用的，单独用 YARA 编译不出来。
-`yara.compile(filepaths=...)` 是原子的——一个文件编译不过，整个规则库就
-全军覆没。所以引擎会退化成逐文件编译、剔除坏的、保留好的，并如实报告
-跳过了哪些。用 `python -m app.cli engines` 能看到当前加载状态。
+`yara.compile(filepaths=...)` 是原子的——一个规则文件编译不过，整个规则库
+就全军覆没。所以引擎会退化成逐文件编译、剔除坏的、保留好的，并如实报告
+跳过了哪些。用 `python -m app.cli engines` 能看到当前加载状态
+（当前是 746/747，唯一跳过的那个需要 `owner`）。
 
 ## meta 约定
 

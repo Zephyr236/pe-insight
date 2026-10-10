@@ -790,7 +790,10 @@ def main(argv: list[str] | None = None) -> int:
 
     upd = sub.add_parser("update", help="更新签名库与规则集")
     upd.add_argument("--check", action="store_true", help="只查看新鲜度，不下载")
-    upd.add_argument("--only", help="只更新指定组件，逗号分隔（clamav,emsisoft,die,capa）")
+    upd.add_argument(
+        "--only",
+        help="只更新指定组件，逗号分隔（clamav,emsisoft,die,capa,yara）",
+    )
     upd.add_argument(
         "--if-stale-hours",
         type=float,

@@ -204,9 +204,10 @@ class TestLoader:
     def test_skips_broken_rules_instead_of_dying(self, engine_cls, tmp_path: Path):
         """一个编不过的规则文件，不能让整个规则库失效。
 
-        这是真实场景：signature-base 747 个文件里有 13 个用到外部变量
-        （filename / filepath / extension），需要 THOR 那类扫描器通过 -d
-        传值。不退化就是整个规则库全废。
+        这是真实场景：signature-base 747 个文件里有 13 个依赖外部变量。
+        其中 12 个由 yara_common.external_values() 提供（filename /
+        filepath / extension / filetype），剩 1 个要 `owner`——那是 NTFS
+        文件属主，Windows 上拿不到，只能跳过。不退化就是整个规则库全废。
         """
         (tmp_path / "good.yar").write_text(
             "rule Good_Rule { condition: uint16(0) == 0x5A4D }", encoding="utf-8"
@@ -232,6 +233,58 @@ class TestLoader:
 @pytest.fixture(params=sorted(ENGINE_CLASSES))
 def engine_cls(request):
     return ENGINE_CLASSES[request.param]
+
+
+class TestExternalVariables:
+    """规则能拿到文件名、后缀、类型，"伪装"这类检测才成立。
+
+    signature-base 里有 652 条规则依赖外部变量（原本给 THOR / LOKI 那种会
+    通过 -d 传值的扫描器用）。不提供的话这些文件根本编译不过；提供了，
+    一批伪装检测规则就活过来了。
+    """
+
+    def test_masquerading_as_system_process_is_detected(
+        self, engine: EngineAdapter, make_context, tmp_path: Path, benign_pe_bytes: bytes
+    ):
+        """把系统 PE 改名成 svchost.exe —— 伪装成系统进程，应当被检出。"""
+        target = tmp_path / "svchost.exe"
+        target.write_bytes(benign_pe_bytes)
+
+        result = engine.timed_scan(make_context(target))
+        rules = [m["rule"] for m in (result.meta or {}).get("matches", [])]
+        assert any("svchost" in r for r in rules), (
+            f"{engine.name} 没认出伪装成 svchost.exe 的文件。命中的规则：{rules}\n"
+            "这条规则依赖外部变量 filename，说明外部变量没有传进扫描。"
+        )
+
+    def test_type_cloaking_is_detected(
+        self, engine: EngineAdapter, make_context, tmp_path: Path, benign_pe_bytes: bytes
+    ):
+        """PE 改名成 .jpg —— 类型伪装，应当被检出。"""
+        target = tmp_path / "photo.jpg"
+        target.write_bytes(benign_pe_bytes)
+
+        result = engine.timed_scan(make_context(target))
+        rules = [m["rule"] for m in (result.meta or {}).get("matches", [])]
+        assert "SUSP_Known_Type_Cloaked_as_JPG" in rules, (
+            f"{engine.name} 没认出伪装成图片的 PE。命中的规则：{rules}"
+        )
+
+    def test_same_bytes_with_normal_name_stay_clean(
+        self, engine: EngineAdapter, make_context, tmp_path: Path, benign_pe_bytes: bytes
+    ):
+        """同样的字节、正常的文件名，必须干净。
+
+        没有这一条，上面两个用例可能只是"无差别命中"——那说明规则坏了，
+        而不是外部变量生效了。
+        """
+        target = tmp_path / "calc.exe"
+        target.write_bytes(benign_pe_bytes)
+
+        result = engine.timed_scan(make_context(target))
+        assert result.verdict.value == "clean", (
+            f"{engine.name} 对正常的 calc.exe 误报了：{result.meta.get('matches')}"
+        )
 
 
 class TestEngineAgreement:
