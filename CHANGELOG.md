@@ -4,6 +4,24 @@
 
 ## [未发布]
 
+### 新增：YARA-X 引擎
+
+新增 `YARA-X` 引擎（VirusTotal 用 Rust 重写的 YARA，走 pip 的 `yara-x`
+绑定，进程内运行），与经典 YARA **跑同一批规则**。
+
+留着两个的理由：YARA-X 是重新实现的，个别规则的行为与经典版有差异，两个
+都跑等于对同一批规则做了一次交叉验证——只跑一个的话，某条规则在一边静默
+失效不会被发现。测试里有专门一条用例断言两边命中同一批规则。
+
+**同源去重**：两者归入同一个 `source_group`，聚合判定时只算一票。不去的
+话，一次命中会显示成 "2/9" 而独立证据只有一份。`EngineAdapter` 新增
+`source_group` 属性，`EngineResult` 带上它，`aggregate()` 按来源统计比例；
+引擎层面的命中数另由 `engines_hit` 如实给出。
+
+顺带纠正一处早先写错的说明：那 13 个编译不过的规则文件，原因是**需要外部
+变量**（`filename` / `filepath` / `extension`，THOR/LOKI 那类扫描器会通过
+`-d` 传值），不是此前注释里写的"本机 yara 构建缺模块"。
+
 ### 修复：全新机器上安装程序全线失败
 
 在一台干净的 Windows 上实测安装，发现两个必现问题：
@@ -37,7 +55,7 @@
 - **逐文件下载而不是下 zip**：整包会被 Windows Defender 检出并锁死
   （`ThreatID 2147965225`，读取报 `OSError Errno 22`），单个 `.yar` 则不会
 - YARA 引擎改为**容错加载**：747 个规则文件里有 13 个用到了本机 yara
-  构建未编入的模块或需要外部变量，而 `yara.compile(filepaths=...)` 是
+  需要外部变量（`filename` / `filepath` / `extension`），而 `yara.compile(filepaths=...)` 是
   原子的，一个坏文件会让整个规则库失效。现在退化为逐文件编译、剔除坏的、
   如实报告跳过了哪些
 - 判定等级由规则名前缀 + `meta.score` 推导（signature-base 不带

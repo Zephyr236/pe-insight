@@ -102,6 +102,9 @@ class EngineResult:
     error: str | None = None
     meta: dict = field(default_factory=dict)
 
+    #: 由 timed_scan 从适配器的 source_group 填进来，供聚合判定按来源去重。
+    source_group: str | None = None
+
     def to_dict(self) -> dict:
         return {
             "engine": self.engine,
@@ -140,6 +143,13 @@ class EngineAdapter(ABC):
     #: 分级依据是**内存**而非耗时——在这类弱机器上，把系统推进换页的元凶
     #: 是内存，不是 CPU 时间。
     resource_class: str = "light"
+
+    #: 同源引擎分组。
+    #:
+    #: 跑同一批规则的引擎归为一组（YARA 和 YARA-X 就是），聚合判定时只算
+    #: 一票。不分组的话，同一份规则命中一次会被数成两个引擎各命中一次，
+    #: 检测比例从 "1/8" 变成 "2/9"——那是同一个证据被算了两次，虚高。
+    source_group: str | None = None
 
     def network_level(self) -> str:
         """引擎实际的网络行为等级，见 NETWORK_LEVELS。
@@ -190,6 +200,8 @@ class EngineAdapter(ABC):
                 error=f"{type(exc).__name__}: {exc}",
             )
         result.duration_ms = int((time.perf_counter() - start) * 1000)
+        # 统一在这里填，免得每条构造路径都要记得写一遍
+        result.source_group = self.source_group
         return result
 
 

@@ -30,6 +30,7 @@ from .die import DieEngine
 from .emsisoft import EmsisoftEngine
 from .manalyze import ManalyzeEngine
 from .yara_engine import YaraEngine
+from .yara_x_engine import YaraXEngine
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +42,10 @@ def all_engines() -> list[EngineAdapter]:
         DefenderEngine(),
         ClamAVEngine(),
         EmsisoftEngine(),
+        # YARA 与 YARA-X 跑同一批规则，互为交叉验证（见 yara_x_engine 的说明）。
+        # 两者同属一个 source_group，聚合判定时只算一票。
         YaraEngine(settings.rules_dirs),
+        YaraXEngine(settings.rules_dirs),
         # 结构/能力分析：不看签名，看这个文件"是什么"和"能干什么"。
         # 签名引擎对新型样本集体失明时，这一层是唯一的线索来源。
         DieEngine(),

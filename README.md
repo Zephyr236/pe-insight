@@ -169,6 +169,10 @@ cd backend
 | **ClamAV** | 需安装 | 完全本地 | `setup-clamav` 一键装；有守护进程时走 clamdscan |
 | **Emsisoft** | 需安装 | 完全本地 | `setup-emsisoft` 一键装 EEK；扫描固定传 `/cloud=0` |
 | **YARA** | 需下规则 | 完全本地 | 规则集 `setup-yara` 一键装（signature-base，5200+ 条）；自有规则放 `rules/` |
+| **YARA-X** | 需下规则 | 完全本地 | VirusTotal 的 Rust 重写版，跑**同一批规则**，与 YARA 互为交叉验证 |
+
+> YARA 和 YARA-X 同属一个"来源"：聚合判定时只算一票，否则同一份规则的
+> 一次命中会被数成两个引擎，检测比例虚高。引擎各自的结论仍如实列出。
 | **Windows Defender** | 开箱可用 | **仅元数据** | `MpCmdRun.exe`。取决于系统设置，运行时查证 |
 
 ### 结构 / 能力分析（不看签名，看"是什么"和"能干什么"）
@@ -611,7 +615,9 @@ backend/app/
     base.py             EngineAdapter 接口 + Verdict 枚举
     defender.py         MpCmdRun 子进程
     clamav.py           clamdscan / clamscan，自动回退
+    yara_common.py      两个 YARA 引擎共用的规则发现与判定映射
     yara_engine.py      yara-python，进程内，容错加载
+    yara_x_engine.py    yara-x（Rust 重写版），同一批规则
     registry.py         构造 + 离线/禁用过滤
   static/
     pe_analyzer.py      PE 结构、节区熵、导入表、加壳启发式

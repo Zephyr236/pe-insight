@@ -32,7 +32,8 @@ cd backend
 ### 加载是容错的
 
 signature-base 有 747 个规则文件，其中十几个用到了本机 yara 构建没编进去
-的模块（`magic` / `macho` / `cuckoo`），或者需要 `filepath` 之类的外部变量。
+需要外部变量（`filename` / `filepath` / `extension`）——那些规则是给 THOR、
+LOKI 这类会通过 `-d` 把文件名传进去的扫描器用的，单独用 YARA 编译不出来。
 `yara.compile(filepaths=...)` 是原子的——一个文件编译不过，整个规则库就
 全军覆没。所以引擎会退化成逐文件编译、剔除坏的、保留好的，并如实报告
 跳过了哪些。用 `python -m app.cli engines` 能看到当前加载状态。

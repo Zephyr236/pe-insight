@@ -41,13 +41,28 @@ def _severity(verdict: Verdict) -> int:
 def aggregate(results: list[EngineResult]) -> dict:
     """把所有引擎的结论聚合成一个总分。
 
-    MVP 用最保守的规则：任一引擎报毒即为恶意。真实产品还应该做加权
-    （不同引擎的误报率不同）和引擎同源去重（很多杀软共用同一家 OEM 引擎）。
+    判定规则仍然保守：任一引擎报毒即为恶意。还没做的是按误报率加权。
+
+    **但同源引擎已经去重**：YARA 和 YARA-X 跑的是同一批规则，如果各算一票，
+    一次命中会变成 "2/9"，而独立证据其实只有一份。所以检测比例按"来源"
+    统计——同一 source_group 的引擎不管命中几个都只算一票，没有分组的引擎
+    各自一票。引擎各自的结论仍然如实保留在结果里，只是不重复计数。
     """
     scored = [r for r in results if r.verdict != Verdict.SKIPPED]
     usable = [r for r in scored if r.verdict != Verdict.ERROR]
-    detections = [r for r in usable if r.verdict.is_detection]
     errors = [r for r in scored if r.verdict == Verdict.ERROR]
+
+    # 按来源分组投票
+    votes: dict[str, list] = {}
+    for result in usable:
+        key = (
+            f"group:{result.source_group}"
+            if result.source_group
+            else f"engine:{result.engine}"
+        )
+        votes.setdefault(key, []).append(result)
+
+    detections = [r for r in usable if r.verdict.is_detection]
 
     if not usable:
         verdict = Verdict.UNKNOWN.value
@@ -58,12 +73,19 @@ def aggregate(results: list[EngineResult]) -> dict:
     else:
         verdict = Verdict.CLEAN.value
 
-    total = len(usable)
+    # 比例按"来源"算，detections / engine_total 与之一致，保证
+    # detections/engine_total 恒等于 detection_ratio。
+    total = len(votes)
+    detecting = sum(
+        1 for members in votes.values() if any(m.verdict.is_detection for m in members)
+    )
     return {
         "verdict": verdict,
-        "detections": len(detections),
+        "detections": detecting,
         "engine_total": total,
-        "detection_ratio": f"{len(detections)}/{total}" if total else "0/0",
+        "detection_ratio": f"{detecting}/{total}" if total else "0/0",
+        # 引擎层面的命中数。同源引擎会有多个，用来追溯"到底哪几个引擎报了"
+        "engines_hit": len(detections),
         "errored_engines": [r.engine for r in errors],
         "max_severity": max((_severity(r.verdict) for r in usable), default=0),
     }

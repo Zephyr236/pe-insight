@@ -1,16 +1,27 @@
-"""YARA 规则引擎适配器（经典实现，yara-python）。
+"""YARA-X 规则引擎适配器（VirusTotal 的 Rust 重写版，yara-x 绑定）。
 
-规则文件放 `rules/`（项目自有）和 `tools/yara-rules/`（第三方规则集，由
-`setup-yara` 下载）。另有一个跑同一批规则的 YARA-X 引擎，见
-`yara_x_engine.py`。
+跑的是**和经典 YARA 引擎同一批规则**（`rules/` + `tools/yara-rules/`），
+两个引擎归在同一个 `source_group`，聚合判定时只算一票——否则同一份规则
+命中一次会被数成两个引擎，检测比例虚高。
 
-**加载方式是容错的**，这一点不是随手加的：第三方规则集动辄几百个文件、
-上千条规则，其中总有几个需要外部变量（`filepath` / `filename` 之类，
-THOR、LOKI 那类扫描器会通过 `-d` 传进去）。而
-`yara.compile(filepaths=...)` 是原子的——一个文件编译不过，整个规则库
-就全军覆没。实测 signature-base 747 个文件里有 13 个是这样。所以这里的
-策略是：整体编译失败就退化成逐文件编译，剔除坏的、保留好的，并如实
-报告跳过了哪些。
+那为什么还要留着经典 YARA？
+
+- **规则兼容性**：YARA-X 是重新实现的，个别规则的行为与经典版有差异。
+  两个引擎都跑，等于对同一批规则做了一次交叉验证；只跑一个的话，某个
+  规则在某一边静默失效不会被发现。
+- **编译容错不同**：两边对同一批规则各自决定能编哪些，覆盖面不完全重合。
+- **可对照**：分析员看到两边的命中列表不一致时，那条规则值得单独看一眼。
+
+代价是内存和启动时间各多一份。实测 yara-x 在 747 个规则文件上
+`add_source` 约 5 秒、`build` 约 2 秒，进程内运行、内存占用可忽略。
+
+与经典版的两处接口差异（已在 yara_common 里对齐语义）：
+
+- 命名空间：YARA-X 用 `Compiler.new_namespace()` 切换，粒度是"下一次
+  add_source 用哪个命名空间"，不能像 yara-python 那样一次传整个 filepaths
+  映射。这里按文件逐个切换，效果一致。
+- 元数据：`Match.metadata` 是 dict 且保留原始类型（`score` 是 int），
+  比 yara-python 更省事。
 """
 
 from __future__ import annotations
@@ -34,16 +45,16 @@ from .yara_common import (
 )
 
 try:
-    import yara
+    import yara_x
 
-    _YARA_IMPORT_ERROR: str | None = None
+    _YARA_X_IMPORT_ERROR: str | None = None
 except ImportError as exc:  # pragma: no cover - 取决于安装环境
-    yara = None  # type: ignore[assignment]
-    _YARA_IMPORT_ERROR = str(exc)
+    yara_x = None  # type: ignore[assignment]
+    _YARA_X_IMPORT_ERROR = str(exc)
 
 
-class YaraEngine(EngineAdapter):
-    name = "YARA"
+class YaraXEngine(EngineAdapter):
+    name = "YARA-X"
     kind = EngineKind.RULE
     offline = True
     source_group = SOURCE_GROUP
@@ -60,7 +71,7 @@ class YaraEngine(EngineAdapter):
             dirs = tuple(Path(p) for p in rules_dir)
         self._rules_dirs = dirs
         self._rule_timeout = timeout_s
-        self._compiled = None
+        self._rules = None
         self._load_error: str | None = None
         self._loaded_files = 0
         self._skipped: list[tuple[str, str]] = []
@@ -69,49 +80,48 @@ class YaraEngine(EngineAdapter):
     # ------------------------------------------------------------------ 加载
 
     def _load(self) -> None:
-        if yara is None:
-            self._load_error = f"yara-python 未安装：{_YARA_IMPORT_ERROR}"
+        if yara_x is None:
+            self._load_error = f"yara-x 未安装：{_YARA_X_IMPORT_ERROR}"
             return
 
         found = collect_rule_files(self._rules_dirs)
         if not found:
             dirs = "、".join(str(d) for d in self._rules_dirs)
             self._load_error = (
-                f"规则目录为空：{dirs}。放入 .yar 规则文件后重启即可生效；"
-                "第三方规则集用 `python -m app.cli setup-yara` 下载。"
+                f"规则目录为空：{dirs}。第三方规则集用 "
+                "`python -m app.cli setup-yara` 下载。"
             )
             return
 
-        namespaces = unique_namespaces(found)
-
-        # 先整体编译：一次编完最省事，也是绝大多数情况下的路径
-        try:
-            self._compiled = yara.compile(
-                filepaths={ns: str(path) for path, ns in namespaces}
-            )
-            self._loaded_files = len(namespaces)
-            return
-        except Exception as exc:  # noqa: BLE001 - 退化到逐文件，不在这里失败
-            first_error = str(exc).splitlines()[0][:160]
-
-        # 整体编译失败：逐文件找出能编的，剔除编不过的
-        good: dict[str, str] = {}
+        compiler = yara_x.Compiler()
+        loaded = 0
         skipped: list[tuple[str, str]] = []
-        for path, ns in namespaces:
+
+        for path, ns in unique_namespaces(found):
             try:
-                yara.compile(filepaths={ns: str(path)})
-                good[ns] = str(path)
+                source = path.read_text(encoding="utf-8", errors="replace")
+            except OSError as exc:
+                skipped.append((path.name, f"读取失败：{exc}"))
+                continue
+
+            compiler.new_namespace(ns)
+            try:
+                compiler.add_source(source, origin=path.name)
+                loaded += 1
             except Exception as exc:  # noqa: BLE001 - 单个坏文件不应影响其它
+                # 失败的 add_source 不会污染编译器：实测逐个添加时 13 个文件
+                # 报错，随后的 build() 依然成功，坏文件被丢弃。
                 skipped.append((path.name, str(exc).splitlines()[0][:120]))
 
-        if not good:
+        if not loaded:
             self._load_error = (
-                f"全部 {len(namespaces)} 个规则文件都编译失败。首个错误：{first_error}"
+                f"全部 {len(found)} 个规则文件都无法编译。"
+                f"首个错误：{skipped[0][1] if skipped else '未知'}"
             )
             return
 
         try:
-            self._compiled = yara.compile(filepaths=good)
+            self._rules = compiler.build()
         except Exception as exc:  # noqa: BLE001
             self._load_error = (
                 f"剔除 {len(skipped)} 个坏文件后仍无法编译："
@@ -119,13 +129,13 @@ class YaraEngine(EngineAdapter):
             )
             return
 
-        self._loaded_files = len(good)
+        self._loaded_files = loaded
         self._skipped = skipped
 
     # ------------------------------------------------------------ EngineAdapter
 
     def available(self) -> bool:
-        return self._compiled is not None
+        return self._rules is not None
 
     def unavailable_reason(self) -> str:
         return self._load_error or "规则未加载"
@@ -150,25 +160,27 @@ class YaraEngine(EngineAdapter):
         return note
 
     def scan(self, ctx: ScanContext) -> EngineResult:
-        assert self._compiled is not None
+        assert self._rules is not None
 
-        matches = self._compiled.match(
-            str(ctx.sample_path),
-            timeout=self._rule_timeout,
-        )
-        if not matches:
+        scanner = yara_x.Scanner(self._rules)
+        scanner.set_timeout(self._rule_timeout)
+
+        try:
+            results = scanner.scan_file(str(ctx.sample_path))
+        except Exception as exc:  # noqa: BLE001 - 读不了的文件不该让整轮扫描失败
             return EngineResult(
                 engine=self.name,
-                verdict=Verdict.CLEAN,
-                detail=f"未命中任何规则（{self.load_note()}）",
+                verdict=Verdict.ERROR,
+                detail=f"扫描失败：{str(exc)[:160]}",
+                error=str(exc)[:300],
             )
 
         hits: list[dict] = []
         worst = Verdict.SUSPICIOUS
 
-        for match in matches:
-            meta = dict(match.meta or {})
-            level = verdict_for(match.rule, meta)
+        for match in results.matching_rules:
+            meta = dict(match.metadata or {})
+            level = verdict_for(match.identifier, meta)
             if level == "malicious":
                 worst = Verdict.MALICIOUS
             elif level == "pup" and worst != Verdict.MALICIOUS:
@@ -176,7 +188,7 @@ class YaraEngine(EngineAdapter):
 
             hits.append(
                 {
-                    "rule": match.rule,
+                    "rule": match.identifier,
                     "namespace": match.namespace,
                     "tags": list(match.tags or []),
                     "family": meta.get("family"),
@@ -184,6 +196,13 @@ class YaraEngine(EngineAdapter):
                     "score": meta.get("score"),
                     "verdict": level,
                 }
+            )
+
+        if not hits:
+            return EngineResult(
+                engine=self.name,
+                verdict=Verdict.CLEAN,
+                detail=f"未命中任何规则（{self.load_note()}）",
             )
 
         hits = sort_hits(hits)

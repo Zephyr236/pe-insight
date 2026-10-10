@@ -234,6 +234,7 @@ $r.id
   "detection_ratio": "2/7",
   "detections": 2,
   "engine_total": 7,
+  "engines_hit": 3,
 
   "engines": [
     { "engine": "Windows Defender", "verdict": "clean",      "signature": null,              "duration_ms": 824,    "error": null },
@@ -275,6 +276,11 @@ $r.id
 > **注意 `skipped`**：Windows Defender 云保护开启时会被安全策略排除，
 > 此时它出现在 `engines` 里但 `verdict` 是 `skipped`，且**不计入**
 > `engine_total`。所以 `detection_ratio` 的分母可能小于引擎总数。
+
+> **注意同源引擎**：YARA 和 YARA-X 跑的是同一批规则，算作同一个来源，
+> 在 `detection_ratio` 里只占一票。所以上面的例子里比例是 `2/7`，
+> 而 `engines_hit` 是 3——后者是"实际有几个引擎报了"，前者是
+> "有几份独立证据"。同一个来源的多个引擎不会让证据变强，故不重复计数。
 
 ---
 

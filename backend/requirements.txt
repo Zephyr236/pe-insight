@@ -16,6 +16,10 @@ pydantic>=2.7.0
 pefile>=2024.8.26
 yara-python>=4.5.1
 
+# YARA-X：VirusTotal 用 Rust 重写的 YARA，与 yara-python 跑同一批规则。
+# 两者互为交叉验证，聚合判定时算同一票（见 engines/yara_common.py）。
+yara-x>=1.21.0
+
 # 动态分析（模拟执行，样本不真正运行）
 # 注意：speakeasy-emulator 依赖已被 setuptools 81+ 移除的 distutils，
 # 安装前需要先装 "setuptools<81"。同时它对 Python 3.12+ 支持不稳定，
