@@ -100,7 +100,12 @@ cd pe-insight
 .\setup.ps1 -SkipTools      # 只装代码依赖，不下载 2.5 GB 引擎
 .\setup.ps1 -BuildFrontend  # 从源码重建前端（改 frontend/src/ 时才需要，要 Node.js）
 .\setup.ps1 -Force          # 强制重跑所有步骤
+.\setup.ps1 -Yes            # 全程不提问，一律按"是"处理
 ```
+
+`-Yes` 供无人值守安装使用（CI、批量部署、脚本里调用）。默认情况下脚本会在
+**自动安装 uv** 和**开始下载 2.5 GB 引擎**前各问一次，加了 `-Yes` 就都不再
+提问、直接继续。`setup.bat` 会把参数透传，所以 `setup.bat -Yes` 同样有效。
 
 ### start 会做什么
 

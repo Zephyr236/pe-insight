@@ -4,6 +4,7 @@
 #   .\setup.ps1 -SkipTools       只装代码依赖，不下载分析引擎
 #   .\setup.ps1 -BuildFrontend   从源码重建前端（需要 Node.js，改前端时才用）
 #   .\setup.ps1 -Force           重新执行所有步骤，不跳过已完成项
+#   .\setup.ps1 -Yes             全程不提问，一律按"是"处理（无人值守安装用）
 #
 # 这个脚本会依次完成：
 #   1. 检查 Windows 与 Python 版本
@@ -23,7 +24,8 @@
 param(
     [switch]$SkipTools,
     [switch]$BuildFrontend,
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -75,7 +77,8 @@ if (-not $uv) {
     Say '  安装它只需一条命令，会从 astral.sh 官方源下载：'
     Say '    irm https://astral.sh/uv/install.ps1 | iex'
     Say ''
-    $ans = Read-Host '  现在自动安装 uv？(y/N)'
+    # -Yes：无人值守模式，不提问直接按默认继续
+    $ans = if ($Yes) { 'y' } else { Read-Host '  现在自动安装 uv？(y/N)' }
     if ($ans -notmatch '^[yY]') {
         Die '已取消。装好 uv 后重新运行本脚本。'
     }
@@ -178,7 +181,8 @@ if ($SkipTools) {
     Say '  下载的是各引擎本体和签名库，**不涉及任何样本上传**。'
     Say ''
 
-    $ans = Read-Host '  现在开始下载？(Y/n)'
+    # -Yes：无人值守模式，不提问直接开始下载
+    $ans = if ($Yes) { 'y' } else { Read-Host '  现在开始下载？(Y/n)' }
     if ($ans -match '^[nN]') {
         Warn '已跳过。之后按上面的命令可以随时补上。'
     } else {
